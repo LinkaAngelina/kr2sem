@@ -1,0 +1,182 @@
+CalculatorModel.java
+import java.io.*;
+import java.util.*;
+import javax.script.*;
+
+public class CalculatorModel {
+    private final List<String> history = new ArrayList<>();
+    private final File historyFile = new File("history.log");
+
+    public CalculatorModel() {
+        loadHistory();
+    }
+
+    public double calculate(String expression) throws Exception {
+        expression = expression.replaceAll("//", "/");
+        expression = expression.replace("^", "**");
+
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
+        Object result = engine.eval(expression.replace("**", "^"));
+        double val = Double.parseDouble(result.toString());
+        history.add(expression + " = " + val);
+        saveHistory();
+        return val;
+    }
+
+    public List<String> getHistory() {
+        return history;
+    }
+
+    private void loadHistory() {
+        if (historyFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(historyFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    history.add(line);
+                }
+            } catch (IOException e) {
+                System.out.println("Ошибка загрузки истории.");
+            }
+        }
+    }
+
+    private void saveHistory() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(historyFile))) {
+            for (String record : history) {
+                writer.write(record);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Ошибка сохранения истории.");
+        }
+    }
+
+    public void exportSelected(List<Integer> indices, String pathInput) {
+        File exportFile;
+
+        if (pathInput == null || pathInput.isEmpty()) {
+            exportFile = new File("history.log");
+        } else {
+            File userPath = new File(pathInput);
+            if (userPath.isDirectory()) {
+                exportFile = new File(userPath, "log.log");
+            } else if (userPath.getName().contains(".") && userPath.getParent() != null) {
+                exportFile = userPath;
+            } else if (userPath.getName().contains(".")) {
+                exportFile = new File(System.getProperty("user.dir"), userPath.getName());
+            } else {
+                exportFile = new File(userPath, "log.log");
+            }
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(exportFile))) {
+            for (int index : indices) {
+                if (index >= 0 && index < history.size()) {
+                    writer.write(history.get(index));
+                    writer.newLine();
+                }
+            }
+            System.out.println("Сохранено в: " + exportFile.getAbsolutePath());
+        } catch (IOException e) {
+            System.out.println("Ошибка при сохранении: " + e.getMessage());
+        }
+    }
+}
+CalculatorView.java
+import java.util.List;
+import java.util.Scanner;
+
+public class CalculatorView {
+    private final Scanner scanner = new Scanner(System.in);
+
+    public String getExpression() {
+        System.out.print("Введите выражение: ");
+        return scanner.nextLine();
+    }
+
+    public void showResult(double result) {
+        System.out.println("Результат: " + result);
+    }
+
+    public void showHistory(List<String> history) {
+        System.out.println("\nИстория:");
+        for (int i = 0; i < history.size(); i++) {
+            System.out.println((i + 1) + ": " + history.get(i));
+        }
+    }
+
+    public void showMenu() {
+        System.out.println("""
+            \nМеню:
+            1. Ввести выражение
+            2. Показать историю
+            3. Сохранить выбранные выражения
+            4. Выход
+            """);
+    }
+
+    public int getChoice() {
+        System.out.print("Выбор: ");
+        return Integer.parseInt(scanner.nextLine());
+    }
+
+    public List<Integer> getIndicesToSave() {
+        System.out.print("Введите номера строк через запятую: ");
+        String[] parts = scanner.nextLine().split(",");
+        return java.util.Arrays.stream(parts).map(p -> Integer.parseInt(p.trim()) - 1).toList();
+    }
+
+    public String getSavePath() {
+        System.out.print("Введите путь или имя файла для сохранения (Enter — по умолчанию): ");
+        return scanner.nextLine();
+    }
+}
+CalculatorController.java
+public class CalculatorController {
+    private final CalculatorModel model;
+    private final CalculatorView view;
+
+    public CalculatorController(CalculatorModel model, CalculatorView view) {
+        this.model = model;
+        this.view = view;
+    }
+
+    public void run() {
+        boolean running = true;
+
+        while (running) {
+            view.showMenu();
+            int choice = view.getChoice();
+
+            switch (choice) {
+                case 1 -> {
+                    try {
+                        String expr = view.getExpression();
+                        double result = model.calculate(expr);
+                        view.showResult(result);
+                    } catch (Exception e) {
+                        System.out.println("Ошибка: " + e.getMessage());
+                    }
+                }
+                case 2 -> view.showHistory(model.getHistory());
+                case 3 -> {
+                    view.showHistory(model.getHistory());
+                    var indices = view.getIndicesToSave();
+                    String path = view.getSavePath();
+                    model.exportSelected(indices, path);
+                }
+                case 4 -> running = false;
+                default -> System.out.println("Неверный выбор.");
+            }
+        }
+    }
+}
+Main.Java
+public class Main {
+    public static void main(String[] args) {
+        CalculatorModel model = new CalculatorModel();
+        CalculatorView view = new CalculatorView();
+        CalculatorController controller = new CalculatorController(model, view);
+        controller.run();
+    }
+}
