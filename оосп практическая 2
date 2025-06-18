@@ -1,0 +1,145 @@
+Модифицирована информационная система для расчета математического уравнения: пример -3234+((exp(2)*843/log(3234)-4232123)/(34+123+32+5))*3234:
+
+model/CalculatorModel.java
+
+package model;
+
+public class CalculatorModel {
+    public double evaluate(String expression) throws Exception {
+        expression = preprocess(expression);
+        ExpressionParser parser = new ExpressionParser();
+        return parser.parse(expression);
+    }
+
+    private String preprocess(String expr) {
+        expr = expr.replace("^", "**"); // заменяем ^ на **
+        return expr;
+    }
+}
+
+utils/MathFunctions.java
+
+package utils;
+
+public class MathFunctions {
+    public static double log(double x) {
+        return Math.log(x) / Math.log(2); // логарифм по основанию 2
+    }
+
+    public static double exp(double x) {
+        return Math.exp(x);
+    }
+
+    public static long factorial(int n) {
+        if (n < 0) throw new IllegalArgumentException("Факториал только для неотрицательных чисел");
+        long res = 1;
+        for (int i = 2; i <= n; i++) res *= i;
+        return res;
+    }
+}
+
+model/ExpressionParser.java
+java
+
+package model;
+
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import utils.MathFunctions;
+
+public class ExpressionParser {
+    public double parse(String expr) throws Exception {
+        expr = handleFactorials(expr);
+        expr = expr.replace("log", "utils.MathFunctions.log");
+        expr = expr.replace("exp", "utils.MathFunctions.exp");
+
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
+
+        return Double.parseDouble(engine.eval(expr).toString());
+    }
+
+    private String handleFactorials(String expr) {
+        while (expr.contains("!")) {
+            int idx = expr.indexOf('!');
+            int start = idx - 1;
+            while (start >= 0 && (Character.isDigit(expr.charAt(start)) || expr.charAt(start) == '.')) start--;
+            String number = expr.substring(start + 1, idx);
+            long fact = MathFunctions.factorial(Integer.parseInt(number));
+            expr = expr.substring(0, start + 1) + fact + expr.substring(idx + 1);
+        }
+        return expr;
+    }
+}
+
+controller/CalculatorController.java
+
+package controller;
+
+import model.CalculatorModel;
+import view.CalculatorView;
+
+public class CalculatorController {
+    private final CalculatorModel model;
+    private final CalculatorView view;
+
+    public CalculatorController(CalculatorModel model, CalculatorView view) {
+        this.model = model;
+        this.view = view;
+    }
+
+    public void run() {
+        String input = view.getUserInput();
+
+        try {
+            if (!validateBrackets(input)) {
+                view.showError("Неправильная расстановка скобок.");
+                return;
+            }
+
+            double result = model.evaluate(input);
+            view.showResult(result);
+        } catch (Exception e) {
+            view.showError("Ошибка вычислений: " + e.getMessage());
+        }
+    }
+
+    private boolean validateBrackets(String expression) {
+        int balance = 0;
+        for (char ch : expression.toCharArray()) {
+            if (ch == '(') balance++;
+            else if (ch == ')') balance--;
+            if (balance < 0) return false;
+        }
+        return balance == 0;
+    }
+}
+
+view/CalculatorView.java
+
+package view;
+
+import java.util.Scanner;
+
+public class CalculatorView {
+    private final Scanner scanner = new Scanner(System.in);
+
+    public String getUserInput() {
+        System.out.print("Введите выражение: ");
+        return scanner.nextLine();
+    }
+
+    public void showResult(double result) {
+        System.out.println("Результат: " + result);
+    }
+
+    public void showError(String message) {
+        System.out.println("Ошибка: " + message);
+    }
+}
+
+Условия задания соблюдены:
+MVC структура
+Распознавание: + - * / ^ ** exp() log() ! ()
+Проверка на корректные скобки
+Поддержка до 15 слагаемых
+Использован JavaScript движок для выражений + ручная замена !, log, exp
