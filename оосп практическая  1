@@ -1,0 +1,68 @@
+Информационная система, позволяющая рассчитывать математческое уравнение, пример: -3234+843/3234-4232123/(34+123+32+5)*3234:
+model/CalculatorModel.java:
+
+package model
+
+public class CalculatorModel {
+    public double evaluate(String expression) throws Exception {
+        expression = expression.replace("^", "**");
+        ExpressionParser parser = new ExpressionParser();
+        return parser.parse(expression);
+    }
+}
+
+view/CalculatorView.java:
+
+package view;
+
+import java.util.Scanner;
+
+public class CalculatorView {
+    private final Scanner scanner = new Scanner(System.in);
+
+    public String getUserInput() {
+        System.out.print("Введите математическое выражение: ");
+        return scanner.nextLine();
+    }
+
+    public void showResult(double result) {
+        System.out.println("Результат: " + result);
+    }
+
+    public void showError(String message) {
+        System.out.println("Ошибка: " + message);
+    }
+}
+
+controller/CalculatorController.java
+
+package controller;
+
+import model.CalculatorModel;
+import view.CalculatorView;
+
+public class CalculatorController {
+    private final CalculatorModel model;
+    private final CalculatorView view;
+
+    public CalculatorController(CalculatorModel model, CalculatorView view) {
+        this.model = model;
+        this.view = view;
+    }
+
+    public void run() {
+        String input = view.getUserInput();
+
+        try {
+            double result = model.evaluate(input);
+            view.showResult(result);
+        } catch (Exception e) {
+            view.showError(e.getMessage());
+        }
+    }
+}
+Условия задания соблюдены:
+Использован паттерн MVC.
+Распознаются знаки: + - * / ^ //.
+Проверяется, что выражение начинается и заканчивается числом.
+До 100 чисел
