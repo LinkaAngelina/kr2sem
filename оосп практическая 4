@@ -1,0 +1,152 @@
+Реализован API-интерфейс для подключения, загрузки, хранения и выгрузки результатов:
+
+model/Record.java
+
+package model;
+
+public class Record {
+    public String id;
+    public String content;
+    public boolean readOnly;
+
+    public Record(String id, String content, boolean readOnly) {
+        this.id = id;
+        this.content = content;
+        this.readOnly = readOnly;
+    }
+
+    @Override
+    public String toString() {
+        return "[" + id + "] " + content + (readOnly ? " [read-only]" : "");
+    }
+}
+
+storage/Database.java
+
+package storage;
+
+import model.Record;
+import java.util.HashMap;
+import java.util.Map;
+
+public class Database {
+    private static final Map<String, Record> db = new HashMap<>();
+
+    public static void save(Record record) {
+        db.put(record.id, record);
+    }
+
+    public static Record get(String id) {
+        return db.get(id);
+    }
+
+    public static Map<String, Record> getAll() {
+        return db;
+    }
+}
+
+storage/Cache.java
+
+package storage;
+
+import model.Record;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class Cache {
+    private static final Map<String, Record> cache = new HashMap<>();
+
+    public static void cacheIfReadOnly(Record r) {
+        if (r.readOnly) {
+            cache.put(r.id, r);
+        }
+    }
+
+    public static Record get(String id) {
+        return cache.get(id);
+    }
+
+    public static void clear() {
+        cache.clear();
+    }
+
+    public static Map<String, Record> getAll() {
+        return cache;
+    }
+}
+
+controller/ApiInterface.java
+
+package controller;
+
+import model.Record;
+import storage.Cache;
+import storage.Database;
+
+import java.util.Map;
+
+public class ApiInterface {
+
+    // Загрузка данных в БД
+    public void loadData(Record record) {
+        Database.save(record);
+        Cache.cacheIfReadOnly(record);
+    }
+
+    // Получить данные (сначала из кэша, если read-only)
+    public Record getData(String id) {
+        Record fromCache = Cache.get(id);
+        if (fromCache != null) {
+            System.out.println("Из кэша:");
+            return fromCache;
+        }
+
+        System.out.println("Из БД:");
+        return Database.get(id);
+    }
+
+    // Сохранить новые данные
+    public void saveData(String id, String content, boolean readOnly) {
+        Record r = new Record(id, content, readOnly);
+        Database.save(r);
+        if (readOnly) {
+            Cache.cacheIfReadOnly(r);
+        }
+    }
+
+    // Выгрузка всех данных
+    public void exportData() {
+        System.out.println("=== Выгрузка (все записи): ===");
+        for (Map.Entry<String, Record> e : Database.getAll().entrySet()) {
+            System.out.println(e.getValue());
+        }
+    }
+}
+
+Main.java
+
+import controller.ApiInterface;
+import model.Record;
+
+public class Main {
+    public static void main(String[] args) {
+        ApiInterface api = new ApiInterface();
+
+        api.loadData(new Record("1", "Результат выборов", true));  // read-only
+        api.loadData(new Record("2", "Черновик отчета", false));   // обычный
+
+        System.out.println(api.getData("1")); // из кэша
+        System.out.println(api.getData("2")); // из БД
+
+        api.saveData("3", "Итоговый отчет", true); // новое, read-only
+        System.out.println(api.getData("3")); // сразу в кэше
+
+        api.exportData(); // выгрузка
+    }
+
+Условия задания соблюдены:
+Кэшируются только read-only
+Данные без флага берутся из БД
+Выгрузка данных по команде
+Поддержка 1 пользователя
